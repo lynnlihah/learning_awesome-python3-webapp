@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
 # 封装常用的SELECT、INSERT、UPDATE和DELETE操作用函数
 # aiomysql为MySQL数据库提供了异步IO的驱动。
 # 实例代码原址： https://github.com/michaelliao/awesome-python3-webapp/blob/day-03/www/orm.py
@@ -92,6 +93,8 @@ users = User.findAll()
 
 # 定义Model - 首先要定义的是所有ORM映射的基类Model
 class Model(dict, metaclass=ModelMetaclass):
+    # Model从dict继承，所以具备所有dict的功能，同时又实现了特殊方法__getattr__()和__setattr__()，
+    # 因此又可以像引用普通字段那样写：user['id'] or user.id
     def __init__(self, **kw):
         super(Model, self).__init__(**kw)
 
@@ -116,6 +119,8 @@ class Model(dict, metaclass=ModelMetaclass):
                 logging.debug('using default value for %s: %s' % (key, str(value)))
                 setattr(self, key, value)
             return value
+    # findAll(), findNumber(), update(), remove() 这些方法都必须用@asyncio.coroutine装饰，
+    # 变成一个协程。
     @classmethod
     async def findAll(cls, where=None, args=None, **kw):
         ' find objects by where clause. '
@@ -182,3 +187,83 @@ class Model(dict, metaclass=ModelMetaclass):
         rows = await execute(self.__delete__, args)
         if rows != 1:
             logging.warn('failed to remove by primary key: affected rows: %s' % rows)
+
+
+# Field 及 各种 Field 子类
+class Field(object):
+    def __init__(self, name, column_type, primary_key, default):
+        self.name = name
+        self.column_type = column_type
+        self.primary_key = primary_key
+        self.default = default
+
+    def __str__(self):
+        return '<%s, %s:%s>' % (self.__class__.__name__, self.column_type, self.name)
+
+class StringField(Field):
+    def __init__(self, name=None, primary_key=False, default=None, ddl='varchar(100)'):
+        super().__init__(name, ddl, primary_key, default)
+
+class BooleanField(Field):
+    def __init__(self, name=None, default=False):
+        super().__init__(name, 'boolean', False, default)
+
+class IntegerField(Field):
+    def __init__(self, name=None, primary_key=False,default=0):
+        super().__init__(name, 'bigint', primary_key, default)
+
+class FloatField(Field):
+    def __init__(self, name=None, primary_key=False, default=0.0):
+        super().__init__(name, 'real', primary_key, default)
+
+class TextField(Field):
+    def __init__(self, name=None, defalt=None):
+        super().__init__(name, 'text', False, defalt)
+
+# 注意到Model只是一个基类，如何将具体的子类如User的映射信息读取出来呢？
+# 答案就是通过metaclass：ModelMetaclass：
+# user = yield from User.find('123')
+class ModelMetaclass(type):
+    def __new__(cls, name, bases, attrs):
+        if name=='Model':
+            return type.__new__(cls, name, bases, attrs)
+        tablename = attrs.get('__table__', None) or name
+        logging.info('found model: %s (table: %s)' % (name, tableName))
+        mappings = dict()
+        fields = []
+        primaryKey = None
+        for k, v in attrs.items():
+            if isinstance(v, Field):
+                logging.info(' found mapping: %s ==> %s' % (k, v))
+                mappings[k] = v
+                if v.primary_key:
+                    # 找到主键
+                    if primaryKey:
+                        raise StandardError('Duplicate primary key for field: %s' % k)
+                    primaryKey = k
+                else:
+                    fields.append(k)
+        if not primaryKey:
+            raise StandardError('Primary key no found.')
+        for k in mappings.keys():
+            attrs.pop(k)
+        escaped_fields = list(map(lambda f: '`%s`' % f, fields))
+        attrs['__mappings__'] = mappings  # 保存属性和列的映射关系
+        attrs['__table__'] = tableName
+        attrs['__primary_key__'] = primaryKey  # 主键属性名
+        attrs['__fields__'] = fields  # 除主键外的属性名
+        attrs['__select__'] = 'select `%s`, %s from `%s`' % (primaryKey, ', '.join(escaped_fields), tableName)
+        attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (
+        tableName, ', '.join(escaped_fields), primaryKey, create_args_string(len(escaped_fields) + 1))
+        attrs['__update__'] = 'update `%s` set %s where `%s`=?' % (
+        tableName, ', '.join(map(lambda f: '`%s`=?' % (mappings.get(f).name or f), fields)), primaryKey)
+        attrs['__delete__'] = 'delete from `%s` where `%s`=?' % (tableName, primaryKey)
+        return type.__new__(cls, name, bases, attrs)
+# 这样，任何继承自Model的类（比如User），会自动通过ModelMetaclass扫描映射关系，并存储到自身的类属性如
+# __table__、__mappings__中。
+
+# 调用时需要特别注意：
+# user.save()
+# 没有任何效果，因为调用save()仅仅是创建了一个协程，并没有执行它。一定要用：
+# yield from user.save()
+# 才真正执行了INSERT操作。
