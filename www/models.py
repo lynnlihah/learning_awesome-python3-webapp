@@ -46,3 +46,19 @@ class Comment(Model):
     user_image = StringField(ddl='varchar(500)')
     content = TextField()
     created_at = FloatField(default=time.time)
+
+# 初始化数据库之后就可以真正开始编写代码操作对象了
+'''
+import orm
+from models import User, Blog, Comment
+
+def test():
+    yield from orm.create_pool(user='www-data', password='www-data', database='awesome')
+
+    u = User(name='Test', email='test@example.com', passwd='1234567890', image='about:blank')
+
+    yield from u.save()
+
+for x in test():
+    pass
+'''
