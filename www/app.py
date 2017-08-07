@@ -115,6 +115,7 @@ def datetime_filter(t):
 #     return web.Response(body=b'<h1>Awesome</h1>',content_type='text/html')
 #     return web.Response(body=b'<h1>Awesome</h1>') 不填写 content_type 会自动变成下载页面
 
+
 async def init(loop):
     await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='www', password='www', db='awesome')
     app = web.Application(loop=loop, middlewares=[
