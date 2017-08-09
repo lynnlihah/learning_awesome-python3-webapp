@@ -91,9 +91,15 @@ user.insert()
 users = User.findAll()
 '''
 
+def create_args_string(num):
+    L = []
+    for n in range(num):
+        L.append('?')
+    return ', '.join(L)
 
 # Field 及 各种 Field 子类
 class Field(object):
+
     def __init__(self, name, column_type, primary_key, default):
         self.name = name
         self.column_type = column_type
@@ -104,50 +110,56 @@ class Field(object):
         return '<%s, %s:%s>' % (self.__class__.__name__, self.column_type, self.name)
 
 class StringField(Field):
+
     def __init__(self, name=None, primary_key=False, default=None, ddl='varchar(100)'):
         super().__init__(name, ddl, primary_key, default)
 
 class BooleanField(Field):
+
     def __init__(self, name=None, default=False):
         super().__init__(name, 'boolean', False, default)
 
 class IntegerField(Field):
-    def __init__(self, name=None, primary_key=False,default=0):
+
+    def __init__(self, name=None, primary_key=False, default=0):
         super().__init__(name, 'bigint', primary_key, default)
 
 class FloatField(Field):
+
     def __init__(self, name=None, primary_key=False, default=0.0):
         super().__init__(name, 'real', primary_key, default)
 
 class TextField(Field):
-    def __init__(self, name=None, defalt=None):
-        super().__init__(name, 'text', False, defalt)
+
+    def __init__(self, name=None, default=None):
+        super().__init__(name, 'text', False, default)
+
 
 # 注意到Model只是一个基类，如何将具体的子类如User的映射信息读取出来呢？
 # 答案就是通过metaclass：ModelMetaclass：
 # user = yield from User.find('123')
 class ModelMetaclass(type):
     def __new__(cls, name, bases, attrs):
-        if name=='Model':
+        if name == 'Model':
             return type.__new__(cls, name, bases, attrs)
-        tablename = attrs.get('__table__', None) or name
+        tableName = attrs.get('__table__', None) or name
         logging.info('found model: %s (table: %s)' % (name, tableName))
         mappings = dict()
         fields = []
         primaryKey = None
         for k, v in attrs.items():
             if isinstance(v, Field):
-                logging.info(' found mapping: %s ==> %s' % (k, v))
+                logging.info('  found mapping: %s ==> %s' % (k, v))
                 mappings[k] = v
                 if v.primary_key:
-                    # 找到主键
+                    # 找到主键:
                     if primaryKey:
                         raise StandardError('Duplicate primary key for field: %s' % k)
                     primaryKey = k
                 else:
                     fields.append(k)
         if not primaryKey:
-            raise StandardError('Primary key no found.')
+            raise StandardError('Primary key not found.')
         for k in mappings.keys():
             attrs.pop(k)
         escaped_fields = list(map(lambda f: '`%s`' % f, fields))
@@ -156,10 +168,8 @@ class ModelMetaclass(type):
         attrs['__primary_key__'] = primaryKey  # 主键属性名
         attrs['__fields__'] = fields  # 除主键外的属性名
         attrs['__select__'] = 'select `%s`, %s from `%s`' % (primaryKey, ', '.join(escaped_fields), tableName)
-        attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (
-        tableName, ', '.join(escaped_fields), primaryKey, create_args_string(len(escaped_fields) + 1))
-        attrs['__update__'] = 'update `%s` set %s where `%s`=?' % (
-        tableName, ', '.join(map(lambda f: '`%s`=?' % (mappings.get(f).name or f), fields)), primaryKey)
+        attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (tableName, ', '.join(escaped_fields), primaryKey, create_args_string(len(escaped_fields) + 1))
+        attrs['__update__'] = 'update `%s` set %s where `%s`=?' % (tableName, ', '.join(map(lambda f: '`%s`=?' % (mappings.get(f).name or f), fields)), primaryKey)
         attrs['__delete__'] = 'delete from `%s` where `%s`=?' % (tableName, primaryKey)
         return type.__new__(cls, name, bases, attrs)
 # 这样，任何继承自Model的类（比如User），会自动通过ModelMetaclass扫描映射关系，并存储到自身的类属性如

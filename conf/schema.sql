@@ -44,8 +44,8 @@ create table comments (
     key `idx_created_at` (`created_at`),
     primary key (`id`)
 ) engine=innodb default charset=utf8;
-
 -- 如果表的数量很多，可以从Model对象直接通过脚本自动生成SQL脚本，使用更简单。
 -- 数据库初始化
 -- 把SQL脚本放到MySQL命令行里执行：
 -- mysql -u root -p < schema.sql
+-- windwos：  进入对应表，运行 source d:/database.sql  
