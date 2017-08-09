@@ -48,4 +48,4 @@ create table comments (
 -- 数据库初始化
 -- 把SQL脚本放到MySQL命令行里执行：
 -- mysql -u root -p < schema.sql
--- windwos：  进入对应表，运行 source d:/database.sql  
+-- windwos：  进入对应表，运行 source d:/database.sql
