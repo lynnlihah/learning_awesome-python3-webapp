@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-'''
-Models for user, blog, comment.
-'''
-
-# 有了ORM，我们就可以把Web App需要的3个表用Model表示出来：
-# User, Blog, Comment
 import time, uuid
-from orm import Model, StringField, BooleanField, FloatField, TextField
+from orm import Model, StringField, BooleanField, FloatFeild, TextField
+
 
 def next_id():
     return '%015d%s000' % (int(time.time() * 1000), uuid.uuid4().hex)
+
 
 class User(Model):
     __table__ = 'users'
@@ -22,7 +18,8 @@ class User(Model):
     admin = BooleanField()
     name = StringField(ddl='varchar(50)')
     image = StringField(ddl='varchar(500)')
-    created_at = FloatField(default=time.time)
+    created_at = FloatFeild(default=time.time)
+
 
 class Blog(Model):
     __table__ = 'blogs'
@@ -34,7 +31,8 @@ class Blog(Model):
     name = StringField(ddl='varchar(50)')
     summary = StringField(ddl='varchar(200)')
     content = TextField()
-    created_at = FloatField(default=time.time)
+    created_at = FloatFeild(default=time.time)
+
 
 class Comment(Model):
     __table__ = 'comments'
@@ -45,20 +43,8 @@ class Comment(Model):
     user_name = StringField(ddl='varchar(50)')
     user_image = StringField(ddl='varchar(500)')
     content = TextField()
-    created_at = FloatField(default=time.time)
+    created_at = FloatFeild(default=time.time)
 
-# 初始化数据库之后就可以真正开始编写代码操作对象了
-'''
-import orm
-from models import User, Blog, Comment
 
-def test():
-    yield from orm.create_pool(user='www-data', password='www-data', database='awesome')
 
-    u = User(name='Test', email='test@example.com', passwd='1234567890', image='about:blank')
 
-    yield from u.save()
-
-for x in test():
-    pass
-'''
