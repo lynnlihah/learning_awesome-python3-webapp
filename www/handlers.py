@@ -12,7 +12,7 @@ import markdown2
 from aiohttp import web
 
 from coroweb import get,post
-from apis import APIError,APIValueError,APIResourceNotFoundError
+from apis import APIError,APIValueError,APIResourceNotFoundError,Page
 
 from models import User,Comment,Blog,next_id
 from config import configs
@@ -122,6 +122,14 @@ def signout(request):
 	logging.info('user signed out')
 	return r
 
+# 日志管理
+@get('/manage/blogs')
+def manage_blogs(*, page='1'):
+    return {
+        '__template__': 'manage_blogs.html',
+        'page_index': get_page_index(page)
+    }
+
 # 创建blog
 @get('/manage/blogs/create')
 def manage_create_blog():
@@ -200,6 +208,16 @@ def get_page_index(page_str):
         p = 1
     return p
 
+# 获取日志列表
+@get('/api/blogs')
+async def api_blogs(*, page='1'):
+    page_index = get_page_index(page)
+    num = await Blog.findNumber('count(id)')
+    p = Page(num, page_index)
+    if num == 0:
+        return dict(page=p, blogs=())
+    blogs = await Blog.findAll(orderBy='created_at desc', limit=(p.offset, p.limit))
+    return dict(page=p, blogs=blogs)
 
 @get('/blog/{id}')
 async def get_blog(id):
